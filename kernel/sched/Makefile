@@ -31,8 +31,9 @@ endif
 ifdef CONFIG_SCHED_MUQSS
 obj-y += MuQSS.o clock.o
 obj-y += idle.o
-obj-y += build_utility.o
+obj-y += wait.o wait_bit.o swait.o completion.o
 obj-$(CONFIG_SMP) += topology.o
+obj-$(CONFIG_CGROUP_CPUACCT) += cpuacct.o
 else
 #
 # Build efficiency:
