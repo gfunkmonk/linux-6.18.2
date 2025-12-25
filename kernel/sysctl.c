@@ -36,6 +36,13 @@ EXPORT_SYMBOL_GPL(sysctl_long_vals);
 static const int ngroups_max = NGROUPS_MAX;
 static const int cap_last_cap = CAP_LAST_CAP;
 
+#ifdef CONFIG_SCHED_MUQSS
+extern int rr_interval;
+extern int sched_interactive;
+extern int sched_iso_cpu;
+extern int sched_yield_type;
+#endif
+
 #ifdef CONFIG_PROC_SYSCTL
 
 /**
@@ -120,14 +127,6 @@ static int _proc_do_string(char *data, int maxlen, int write,
 
 		data += *ppos;
 		len  -= *ppos;
-static int zero = 0;
-static int one = 1;
-#ifdef CONFIG_SCHED_MUQSS
-extern int rr_interval;
-extern int sched_interactive;
-extern int sched_iso_cpu;
-extern int sched_yield_type;
-#endif
 
 		if (len > *lenp)
 			len = *lenp;

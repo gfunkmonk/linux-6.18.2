@@ -292,7 +292,7 @@ repeat:
 	/* @thread_pid can't go away until free_pids() below */
 	proc_flush_pid(thread_pid);
 	add_device_randomness(&tsk_seruntime(p),
-			      sizeof(unsigned long long));
+			      sizeof(u64));
 	free_pids(post.pids);
 	release_thread(p);
 	/*

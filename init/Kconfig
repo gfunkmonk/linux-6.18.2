@@ -196,7 +196,7 @@ config SCHED_MUQSS
 	  low latency on any hardware.
 
           Say Y here.
-	default y
+	default n
 
 source "kernel/Kconfig.MuQSS"
 

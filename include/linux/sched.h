@@ -1623,7 +1623,7 @@ struct task_struct {
 	/* Used by LSM modules for access restriction: */
 	void				*security;
 #endif
-#ifdef CONFIG_BPF_SYSCALL
+
 #ifdef CONFIG_SCHED_MUQSS
 #define tsk_seruntime(t)		((t)->sched_time)
 #define tsk_rttimeout(t)		((t)->rt_timeout)
@@ -1658,6 +1658,7 @@ static inline bool iso_task(struct task_struct *p)
 }
 #endif /* CONFIG_SCHED_MUQSS */
 
+#ifdef CONFIG_BPF_SYSCALL
 	/* Used by BPF task local storage */
 	struct bpf_local_storage __rcu	*bpf_storage;
 	/* Used for BPF run context */
