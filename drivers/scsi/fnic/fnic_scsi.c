@@ -258,7 +258,7 @@ int fnic_fw_reset_handler(struct fnic *fnic)
 
 	/* wait for io cmpl */
 	while (atomic_read(&fnic->in_flight))
-		schedule_timeout(msecs_to_jiffies(1));
+		schedule_msec_hrtimeout((1));
 
 	spin_lock_irqsave(&fnic->wq_copy_lock[0], flags);
 
