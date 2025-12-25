@@ -27,6 +27,14 @@ ifdef CONFIG_TRACE_BRANCH_PROFILING
 CFLAGS_build_policy.o += -DDISABLE_BRANCH_PROFILING
 CFLAGS_build_utility.o += -DDISABLE_BRANCH_PROFILING
 endif
+
+ifdef CONFIG_SCHED_MUQSS
+obj-y += MuQSS.o clock.o
+obj-y += idle.o
+obj-y += wait.o wait_bit.o swait.o completion.o
+obj-$(CONFIG_SMP) += topology.o
+obj-$(CONFIG_CGROUP_CPUACCT) += cpuacct.o
+else
 #
 # Build efficiency:
 #
@@ -37,3 +45,4 @@ obj-y += core.o
 obj-y += fair.o
 obj-y += build_policy.o
 obj-y += build_utility.o
+endif

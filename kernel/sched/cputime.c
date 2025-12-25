@@ -624,7 +624,7 @@ out:
 void task_cputime_adjusted(struct task_struct *p, u64 *ut, u64 *st)
 {
 	struct task_cputime cputime = {
-		.sum_exec_runtime = p->se.sum_exec_runtime,
+		.sum_exec_runtime = tsk_seruntime(p),
 	};
 
 	if (task_cputime(p, &cputime.utime, &cputime.stime))

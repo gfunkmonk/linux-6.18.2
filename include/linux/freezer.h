@@ -87,6 +87,7 @@ static inline bool try_to_freeze(void) { return false; }
 
 static inline void set_freezable(void) {}
 
+#define pm_freezing (false)
 #endif /* !CONFIG_FREEZER */
 
 #endif	/* FREEZER_H_INCLUDED */

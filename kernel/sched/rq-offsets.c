@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
+#ifndef CONFIG_SCHED_MUQSS
 #define COMPILE_OFFSETS
 #include <linux/kbuild.h>
 #include <linux/types.h>
@@ -10,3 +11,10 @@ int main(void)
 
 	return 0;
 }
+#else
+/* MuQSS doesn't need rq-offsets */
+int main(void)
+{
+	return 0;
+}
+#endif
