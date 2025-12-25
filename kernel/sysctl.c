@@ -36,6 +36,13 @@ EXPORT_SYMBOL_GPL(sysctl_long_vals);
 static const int ngroups_max = NGROUPS_MAX;
 static const int cap_last_cap = CAP_LAST_CAP;
 
+#ifdef CONFIG_SCHED_MUQSS
+extern int rr_interval;
+extern int sched_interactive;
+extern int sched_iso_cpu;
+extern int sched_yield_type;
+#endif
+
 #ifdef CONFIG_PROC_SYSCTL
 
 /**
@@ -1523,3 +1530,4 @@ EXPORT_SYMBOL(proc_dostring);
 EXPORT_SYMBOL(proc_doulongvec_minmax);
 EXPORT_SYMBOL(proc_doulongvec_ms_jiffies_minmax);
 EXPORT_SYMBOL(proc_do_large_bitmap);
+#ifndef CONFIG_SCHED_MUQSS
