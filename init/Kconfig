@@ -198,6 +198,8 @@ config SCHED_MUQSS
           Say Y here.
 	default y
 
+source "kernel/Kconfig.MuQSS"
+
 
 config BROKEN
 	bool
