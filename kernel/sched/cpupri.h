@@ -17,6 +17,7 @@ struct cpupri_vec {
 
 struct cpupri {
 	struct cpupri_vec	pri_to_cpu[CPUPRI_NR_PRIORITIES];
+#ifndef CONFIG_SCHED_MUQSS
 	int			*cpu_to_pri;
 };
 
@@ -27,4 +28,5 @@ int  cpupri_find_fitness(struct cpupri *cp, struct task_struct *p,
 			 bool (*fitness_fn)(struct task_struct *p, int cpu));
 void cpupri_set(struct cpupri *cp, int cpu, int pri);
 int  cpupri_init(struct cpupri *cp);
+#endif
 void cpupri_cleanup(struct cpupri *cp);

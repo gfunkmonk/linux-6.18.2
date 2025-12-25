@@ -120,6 +120,14 @@ static int _proc_do_string(char *data, int maxlen, int write,
 
 		data += *ppos;
 		len  -= *ppos;
+static int zero = 0;
+static int one = 1;
+#ifdef CONFIG_SCHED_MUQSS
+extern int rr_interval;
+extern int sched_interactive;
+extern int sched_iso_cpu;
+extern int sched_yield_type;
+#endif
 
 		if (len > *lenp)
 			len = *lenp;
@@ -1523,3 +1531,4 @@ EXPORT_SYMBOL(proc_dostring);
 EXPORT_SYMBOL(proc_doulongvec_minmax);
 EXPORT_SYMBOL(proc_doulongvec_ms_jiffies_minmax);
 EXPORT_SYMBOL(proc_do_large_bitmap);
+#ifndef CONFIG_SCHED_MUQSS

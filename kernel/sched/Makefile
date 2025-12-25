@@ -22,6 +22,13 @@ ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
 CFLAGS_core.o := $(PROFILING) -fno-omit-frame-pointer
 endif
 
+ifdef CONFIG_SCHED_MUQSS
+obj-y += MuQSS.o clock.o cputime.o
+obj-y += idle.o
+obj-y += wait.o wait_bit.o swait.o completion.o
+
+obj-$(CONFIG_SMP) += topology.o
+else
 # Branch profiling isn't noinstr-safe
 ifdef CONFIG_TRACE_BRANCH_PROFILING
 CFLAGS_build_policy.o += -DDISABLE_BRANCH_PROFILING
@@ -37,3 +44,4 @@ obj-y += core.o
 obj-y += fair.o
 obj-y += build_policy.o
 obj-y += build_utility.o
+endif

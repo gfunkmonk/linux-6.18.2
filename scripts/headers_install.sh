@@ -89,6 +89,7 @@ do
 		if echo "$INFILE:$c" | grep -q "$ignore$"; then
 			leak_error=
 			break
+include/uapi/linux/sched.h:CONFIG_SCHED_MUQSS
 		fi
 	done
 

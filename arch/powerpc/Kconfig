@@ -968,6 +968,8 @@ config PPC_PROT_SAO_LPAR
 config PPC_COPRO_BASE
 	bool
 
+source "kernel/Kconfig.MuQSS"
+
 config PPC_DENORMALISATION
 	bool "PowerPC denormalisation exception handling"
 	depends on PPC_BOOK3S_64

@@ -286,6 +286,7 @@ static inline u64 account_other_time(u64 max)
 	return accounted;
 }
 
+#ifndef CONFIG_SCHED_MUQSS
 #ifdef CONFIG_64BIT
 static inline u64 read_sum_exec_runtime(struct task_struct *t)
 {
@@ -305,6 +306,7 @@ static u64 read_sum_exec_runtime(struct task_struct *t)
 	return ns;
 }
 #endif /* !CONFIG_64BIT */
+#endif /* CONFIG_SCHED_MUQSS */
 
 /*
  * Accumulate raw cputime values of dead tasks (sig->[us]time) and live
