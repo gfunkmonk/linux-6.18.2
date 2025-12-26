@@ -26,14 +26,16 @@ jobs:
           #make x86_64_defconfig
           make my_defconfig
           # make menuconfig or make localyesconfig # Configure the kernel
-
+          
       - name: Build the kernel DEB packages
         run: |
           # Use make deb-pkg or fakeroot make-kpkg
           # fakeroot make-kpkg --initrd kernel_image kernel_headers
           # make CC=clang ... deb-pkg -j$(nproc) # Example for specific compiler
           # The .deb files will be generated in the parent directory
-          make deb-pkg -j$(nproc)
+          make my_defconfig
+          make clean
+          make -j$(nproc) deb-pkg
 
       - name: Upload kernel artifacts
         uses: actions/upload-artifact@v4
