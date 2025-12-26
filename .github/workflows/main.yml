@@ -24,12 +24,11 @@ jobs:
       - name: Clone kernel source
         run: >
           # Git clone the kernel source (e.g., from kern.org or a specific repo)
-          git clone --branch ck --single-branch https://github.com/gfunkmonk/linux-6.18.2
-          cd linux-6.18.2/
+          git clone --branch ck --single-branch --depth=1 https://github.com/gfunkmonk/linux-6.18.2 linux
+          cd linux/
 
       - name: Configure kernel source
         run: |
-          cd linux-6.18.2/
           cp /boot/config-$(uname -r) .config
           # Use make oldconfig to update the config for the new kernel source
           yes "" | make oldconfig
@@ -37,7 +36,6 @@ jobs:
       - name: Build the kernel DEB packages
         run: >
           # Use the 'make deb-pkg' command with parallelism (-j) and custom local version
-          cd linux-6.18.2/
           make -j $(($(nproc) + 1)) bindeb-pkg LOCALVERSION=-ck
           
       - name: Upload kernel artifacts
