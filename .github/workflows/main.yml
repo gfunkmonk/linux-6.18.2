@@ -1,8 +1,15 @@
 name: Build Custom Kernel DEB
-on: [push, workflow_dispatch] # Triggers on push or manual trigger
+
+on:
+  # Trigger the workflow manually from the GitHub Actions UI
+  workflow_dispatch:
+  # Trigger the workflow on pushes to the main branch
+  push:
+    branches:
+      - ck
 
 jobs:
-  build:
+  build_kernel:
     runs-on: ubuntu-latest
 
     steps:
@@ -11,36 +18,39 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          sudo apt update
-          sudo apt install bc bison build-essential cpio flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lz4 rsync schedtool wget zstd debhelper lld -y
           # Install required packages
-          # Use mk-build-deps if you have a debian/control file
-          # sudo mk-build-deps -i
+          sudo apt update
+          sudo apt install bc bison build-essential cpio fakeroot flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lz4 rsync schedtool wget zstd debhelper lld   qt5-default pkg-config devscripts make gcc -y
 
-      - name: Download kernel source and configure
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
+
+      - name: Clone kernel source
         run: |
           # Git clone the kernel source (e.g., from kernel.org or a specific repo)
-          git clone --branch ck --single-branch https://github.com/gfunkmonk/linux-6.18.2
-          cd linux-6.18.2/
-          # cp /boot/config-$(uname -r) ./.config # Copy current config
-          #make x86_64_defconfig
-          make my_defconfig
-          # make menuconfig or make localyesconfig # Configure the kernel
-          
+          git clone --branch ck --single-branch --depth=1 https://github.com/gfunkmonk/linux-6.18.2 linux
+
+      - name: Configure kernel source
+        # Copy the configuration from the running GitHub Actions runner's kernel
+        # This is a common starting point; you can customize it further
+        run: |
+          cd linux/
+          cp /boot/config-$(uname -r) .config
+          # Use make oldconfig to update the config for the new kernel source
+          yes "" | make oldconfig
+
       - name: Build the kernel DEB packages
         run: |
-          # Use make deb-pkg or fakeroot make-kpkg
-          # fakeroot make-kpkg --initrd kernel_image kernel_headers
-          # make CC=clang ... deb-pkg -j$(nproc) # Example for specific compiler
-          # The .deb files will be generated in the parent directory
-          make my_defconfig
-          make clean
-          make -j$(nproc) deb-pkg
+        # Use the 'make deb-pkg' command with parallelism (-j) and custom local version
+          cd linux/
+          make -j $(($(nproc) + 1)) bindeb-pkg LOCALVERSION=-ck
 
       - name: Upload kernel artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kernel-deb-packages
           path: |
-            linux-image-*.deb
-            linux-headers-*.deb
+            linux-*.deb
+            !linux-*dbg*.deb # Exclude debug packages if desired
