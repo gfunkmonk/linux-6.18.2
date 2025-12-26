@@ -1,40 +1,32 @@
 name: Build Custom Kernel DEB
-
-on:
-  # Trigger the workflow manually from the GitHub Actions UI
-  workflow_dispatch:
-  # Trigger the workflow on pushes to the main branch
+'on':
+  workflow_dispatch: null
   push:
     branches:
       - ck
-
 jobs:
   build_kernel:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Install build dependencies
-        run: |
+        run: >
           # Install required packages
           sudo apt update
-          sudo apt install bc bison build-essential cpio fakeroot flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lz4 rsync schedtool wget zstd debhelper lld   qt5-default pkg-config devscripts make gcc -y
-
+          sudo apt install bc bison build-essential cpio fakeroot flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lz4 rsync schedtool wget zstd debhelper lld qt5-default pkg-config devscripts make gcc -y
+          
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 10
 
       - name: Clone kernel source
-        run: |
-          # Git clone the kernel source (e.g., from kernel.org or a specific repo)
+        run: >
+          # Git clone the kernel source (e.g., from kern.org or a specific repo)
           git clone --branch ck --single-branch --depth=1 https://github.com/gfunkmonk/linux-6.18.2 linux
-
+          
       - name: Configure kernel source
-        # Copy the configuration from the running GitHub Actions runner's kernel
-        # This is a common starting point; you can customize it further
         run: |
           cd linux/
           cp /boot/config-$(uname -r) .config
@@ -42,11 +34,11 @@ jobs:
           yes "" | make oldconfig
 
       - name: Build the kernel DEB packages
-        run: |
-        # Use the 'make deb-pkg' command with parallelism (-j) and custom local version
+        run: >
+          # Use the 'make deb-pkg' command with parallelism (-j) and custom local version
           cd linux/
           make -j $(($(nproc) + 1)) bindeb-pkg LOCALVERSION=-ck
-
+          
       - name: Upload kernel artifacts
         uses: actions/upload-artifact@v4
         with:
