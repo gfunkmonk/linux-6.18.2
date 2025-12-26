@@ -22,7 +22,8 @@ jobs:
           # Git clone the kernel source (e.g., from kernel.org or a specific repo)
           git clone https://github.com/gfunkmonk/linux-6.18.2 -b ck
           # cp /boot/config-$(uname -r) ./.config # Copy current config
-          make x86_64_defconfig
+          #make x86_64_defconfig
+          cp config ./.config
           # make menuconfig or make localyesconfig # Configure the kernel
 
       - name: Build the kernel DEB packages
