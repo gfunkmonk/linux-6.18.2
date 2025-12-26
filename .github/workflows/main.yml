@@ -25,6 +25,8 @@ jobs:
           # cp /boot/config-$(uname -r) ./.config # Copy current config
           #make x86_64_defconfig
           cp config ./.config
+          cp config .config
+          make oldconfig config
           # make menuconfig or make localyesconfig # Configure the kernel
 
       - name: Build the kernel DEB packages
