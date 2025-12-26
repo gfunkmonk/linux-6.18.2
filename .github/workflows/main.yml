@@ -1,0 +1,42 @@
+name: Build Custom Kernel DEB
+on: [push, workflow_dispatch] # Triggers on push or manual trigger
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install bc bison build-essential cpio fakeroot flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lz4 rsync schedtool wget zstd debhelper lld -y
+          # Install required packages
+          # Use mk-build-deps if you have a debian/control file
+          # sudo mk-build-deps -i
+
+      - name: Download kernel source and configure
+        run: |
+          # Git clone the kernel source (e.g., from kernel.org or a specific repo)
+          git clone https://github.com/gfunkmonk/linux-6.18.2 -b ck
+          # cp /boot/config-$(uname -r) ./.config # Copy current config
+          make x86_64_defconfig
+          # make menuconfig or make localyesconfig # Configure the kernel
+
+      - name: Build the kernel DEB packages
+        run: |
+          # Use make deb-pkg or fakeroot make-kpkg
+          # fakeroot make-kpkg --initrd kernel_image kernel_headers
+          # make CC=clang ... deb-pkg -j$(nproc) # Example for specific compiler
+          # The .deb files will be generated in the parent directory
+          fakeroot make-kpkg --initrd kernel_image kernel_headers
+
+      - name: Upload kernel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-deb-packages
+          path: |
+            linux-image-*.deb
+            linux-headers-*.deb
