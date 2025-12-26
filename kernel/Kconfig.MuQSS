@@ -1,11 +1,6 @@
-choice
-	depends on SMP
-	prompt "CPU scheduler runqueue sharing"
-	default RQ_MC if SCHED_MUQSS
-	default RQ_NONE
-
 config RQ_NONE
 	bool "No sharing"
+	default y
 	help
 	  This is the default behaviour where the CPU scheduler has one runqueue
 	  per CPU, whether it is a physical or logical CPU (hyperthread).
@@ -13,11 +8,11 @@ config RQ_NONE
 	  This can still be enabled runtime with the boot parameter
 	  rqshare=none
 
-	  If unsure, say N.
+	  If unsure, say Y.
 
 config RQ_SMT
 	bool "SMT (hyperthread) siblings"
-	depends on SCHED_SMT && SCHED_MUQSS
+	depends on SCHED_SMT && !RQ_NONE
 
 	help
 	  With this option enabled, the CPU scheduler will have one runqueue
@@ -32,7 +27,7 @@ config RQ_SMT
 
 config RQ_MC
 	bool "Multicore siblings"
-	depends on SCHED_MC && SCHED_MUQSS
+	depends on SCHED_MC && !RQ_NONE && !RQ_SMT
 	help
 	  With this option enabled, the CPU scheduler will have one runqueue
 	  shared by multicore siblings in addition to any SMT siblings.
@@ -47,11 +42,11 @@ config RQ_MC
 	  This can still be enabled runtime with the boot parameter
 	  rqshare=mc
 
-	  If unsure, say Y.
+	  If unsure, say N.
 
 config RQ_MC_LLC
 	bool "Multicore siblings (LLC)"
-	depends on SCHED_MC && SCHED_MUQSS
+	depends on SCHED_MC && !RQ_NONE && !RQ_SMT && !RQ_MC
 	help
 	  With this option enabled, the CPU scheduler will behave similarly as
 	  with "Multicore siblings".
@@ -66,7 +61,7 @@ config RQ_MC_LLC
 
 config RQ_SMP
 	bool "Symmetric Multi-Processing"
-	depends on SMP && SCHED_MUQSS
+	depends on SMP && !RQ_NONE && !RQ_SMT && !RQ_MC && !RQ_MC_LLC
 	help
 	  With this option enabled, the CPU scheduler will have one runqueue
 	  shared by all physical CPUs unless they are on separate NUMA nodes.
@@ -81,7 +76,7 @@ config RQ_SMP
 
 config RQ_ALL
 	bool "NUMA"
-	depends on SMP && SCHED_MUQSS
+	depends on SMP && !RQ_NONE && !RQ_SMT && !RQ_MC && !RQ_MC_LLC && !RQ_SMP
 	help
 	  With this option enabled, the CPU scheduler will have one runqueue
 	  regardless of the architecture configuration, including across NUMA
@@ -94,7 +89,6 @@ config RQ_ALL
 	  rqshare=all
 
 	  If unsure, say N.
-endchoice
 
 config SHARERQ
 	int

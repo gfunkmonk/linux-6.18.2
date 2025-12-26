@@ -198,7 +198,9 @@ config SCHED_MUQSS
           Say Y here.
 	default n
 
+if SCHED_MUQSS
 source "kernel/Kconfig.MuQSS"
+endif
 
 
 config BROKEN
