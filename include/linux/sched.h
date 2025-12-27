@@ -55,6 +55,11 @@
 
 #ifdef CONFIG_SCHED_MUQSS
 #include <linux/skip_list.h>
+
+/* MuQSS-specific scheduling policy macros */
+#define SCHED_IDLEPRIO		SCHED_IDLE
+#define SCHED_MAX		(SCHED_IDLEPRIO)
+#define SCHED_RANGE(policy)	((policy) <= SCHED_MAX)
 #endif
 
 /* task_struct member predeclarations (sorted alphabetically): */
