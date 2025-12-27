@@ -47,8 +47,8 @@ jobs:
           #version: 1.1
         run: |
           sudo apt update -qy
-          apt install bc bison build-essential ccache cpio debhelper debhelper-compat devscripts equivs fakeroot flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lld lz4 make pkg-config rsync schedtool wget zstd -yq
-          mk-build-deps --install --root-cmd sudo --remove
+          sudo apt install bc bison build-essential ccache cpio debhelper debhelper-compat devscripts equivs fakeroot flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lld lz4 make pkg-config rsync schedtool wget zstd -yq
+          sudo mk-build-deps --install --root-cmd sudo --remove
           
       - name: ⋆˚꩜｡ Set Swap Space
         uses: pierotofy/set-swap-space@master
