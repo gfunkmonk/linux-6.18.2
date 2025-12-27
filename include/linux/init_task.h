@@ -35,7 +35,11 @@ extern struct cred init_cred;
 #define INIT_PREV_CPUTIME(x)
 #endif
 
+#ifdef CONFIG_SCHED_MUQSS
+#define INIT_TASK_COMM "MuQSS"
+#else
 #define INIT_TASK_COMM "swapper"
+#endif
 
 /* Attach to the thread_info data structure for proper alignment */
 #define __init_thread_info __section(".data..init_thread_info")

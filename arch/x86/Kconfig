@@ -1073,6 +1073,24 @@ config SCHED_MC_PRIO
 
 	  If unsure say Y here.
 
+config SMT_NICE
+	bool "SMT (Hyperthreading) aware nice priority and policy support"
+	depends on SCHED_MUQSS && SMP
+	default y
+	help
+	  Enabling Hyperthreading on Intel CPUs decreases the effectiveness
+	  of the use of 'nice' levels and different scheduling policies
+	  (e.g. realtime) due to sharing of CPU power between hyperthreads.
+	  SMT nice support makes each logical CPU aware of what is running on
+	  its hyperthread siblings, maintaining appropriate distribution of
+	  CPU according to nice levels and scheduling policies at the expense
+	  of slightly increased overhead.
+
+	  If unsure say Y here.
+
+
+source "kernel/Kconfig.MuQSS"
+
 config UP_LATE_INIT
 	def_bool y
 	depends on !SMP && X86_LOCAL_APIC

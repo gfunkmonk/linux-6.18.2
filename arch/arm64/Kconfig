@@ -1507,6 +1507,8 @@ config CPU_LITTLE_ENDIAN
 
 endchoice
 
+source "kernel/Kconfig.MuQSS"
+
 config NR_CPUS
 	int "Maximum number of CPUs (2-4096)"
 	range 2 4096
