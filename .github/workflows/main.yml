@@ -16,7 +16,8 @@ env:
   CCACHE_DEPEND: 1
   KBUILD_BUILD_TIMESTAMP: 1970-01-01 00:00:00
   KBUILD_BUILD_VERSION: 1
-
+  ARCH: x86_64
+  
 jobs:
   build_kernel:
     timeout-minutes: 360
@@ -40,15 +41,15 @@ jobs:
           ref: ck
       
       - name: 📦📦 Install build dependencies
-        #uses: awalsh128/cache-apt-pkgs-action@latest
-        #with:
-          #execute_install_scripts: true
-          #packages: bc bison build-essential ccache cpio fakeroot flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lz4 rsync schedtool wget zstd lld pkg-config devscripts make gcc debhelper debhelper-compat libdw-dev
-          #version: 1.1
-        run: |
-          sudo apt update -qy
-          sudo apt install bc bison build-essential ccache cpio debhelper debhelper-compat devscripts equivs fakeroot flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lld lz4 make pkg-config rsync schedtool wget zstd -yq
-          #sudo mk-build-deps --install --root-cmd sudo --remove
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          execute_install_scripts: true
+          packages: bc bison build-essential ccache cpio fakeroot flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lz4 rsync schedtool wget zstd lld pkg-config debhelper debhelper-compat
+          version: 1.1
+        #run: |
+        #  sudo apt update -qy
+        #  sudo apt install bc bison build-essential ccache cpio debhelper debhelper-compat devscripts equivs fakeroot flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lld lz4 make pkg-config rsync schedtool wget zstd -yq
+        #  sudo mk-build-deps --install --root-cmd sudo --remove
           
       - name: ⋆˚꩜｡ Set Swap Space
         uses: pierotofy/set-swap-space@master
@@ -81,9 +82,9 @@ jobs:
       
       - name: 🔨 Compile kernel
         run: |
-          #make defconfig
-          ARCH=amd64 make x86_64_defconfig
-          ARCH=amd64 make -j$(($(nproc) + 1)) CC="ccache gcc" CXX="ccache g++" bindeb-pkg
+          ARCH=x86_64 make defconfig
+          #ARCH=x86_64 make x86_64_defconfig
+          ARCH=x86_64 make -j$(($(nproc) + 1)) CC="ccache gcc" CXX="ccache g++" bindeb-pkg
       
       - name: 🪲 Debug CCACHE (Post-build)
         run: |
