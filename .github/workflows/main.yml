@@ -77,7 +77,10 @@ jobs:
       
       - name: 🔨 Compile kernel
         run: |
-          #make defconfig
+          apt update -yq
+          apt install apt install devscripts equivs build-essential debhelper-compat libdw-dev libelf-dev -yq
+          mk-build-deps --install --root-cmd sudo --remove
+          make defconfig
           make x86_64_defconfig
           make -j$(($(nproc) + 1)) CC="ccache gcc" CXX="ccache g++" bindeb-pkg
       
