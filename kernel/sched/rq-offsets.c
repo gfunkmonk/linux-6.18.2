@@ -6,7 +6,9 @@
 
 int main(void)
 {
+#ifndef CONFIG_SCHED_MUQSS
 	DEFINE(RQ_nr_pinned, offsetof(struct rq, nr_pinned));
+#endif
 
 	return 0;
 }
