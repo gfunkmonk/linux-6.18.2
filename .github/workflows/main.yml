@@ -1,42 +1,91 @@
 name: Build Custom Kernel DEB
-'on':
+on:
   workflow_dispatch: null
-  push:
-    branches:
-      - ck
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  CCACHE_DIR: /mnt/ccache
+  CCACHE_SLOPPINESS: file_macro,locale,time_macros
+  CCACHE_NOHASHDIR: true
+  CCACHE_COMPRESS: 1
+  CCACHE_COMPRESSLEVEL: 9
+  CCACHE_DEPEND: 1
+  KBUILD_BUILD_TIMESTAMP: 1970-01-01 00:00:00
+  KBUILD_BUILD_VERSION: 1
 jobs:
   build_kernel:
+    timeout-minutes: 360
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Install build dependencies
-        run: |
-          # Install required packages
-          sudo apt update
-          sudo apt install -y bc bison build-essential cpio fakeroot flex git kmod libdw-dev libelf-dev libncurses-dev libssl-dev lz4 rsync schedtool wget zstd debhelper lld pkg-config devscripts make gcc
-          
-      - name: Set Swap Space
+      - name: 👉🏻🗑️ Free Disk Space 🗑️
+        uses: jlumbroso/free-disk-space@main
+        with:
+          swap-storage: true
+          large-packages: true
+          tool-cache: false
+      - name: (づ ᴗ _ᴗ)づCheckout repository 🎁
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          ref: ck
+      - name: 📦📦 Install build dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          execute_install_scripts: true
+          packages: bc bison build-essential ccache cpio fakeroot flex git kmod libdw-dev
+            libelf-dev libncurses-dev libssl-dev lz4 rsync schedtool wget zstd
+            lld pkg-config devscripts make gcc debhelper llvm clang
+          version: 1.1
+      - name: ⋆˚꩜｡ Set Swap Space
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 10
-
-      - name: Configure kernel source
+      - name: 📂 Set up CCACHE_DIR mount
         run: |
-          # Use x86_64 defconfig as base configuration
-          make x86_64_defconfig
-          # Use make olddefconfig to set any new options to defaults
-          make olddefconfig
-
-      - name: Build the kernel DEB packages
+          sudo mkdir -p /mnt/ccache
+          sudo chown -R $USER:$USER /mnt/ccache
+          df -h
+      - name: 🏃 Restore CCACHE
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          create-symlink: true
+          key: kernel-build-${{ runner.os }}-${{ hashFiles('Makefile', 'arch/*/Makefile',
+            '.config') }}
+          max-size: 10G
+          restore-keys: kernel-build-${{ runner.os }}-
+          verbose: 2
+      - name: 🪳 Debug CCACHE Status (Pre-build)
         run: |
-          # Use the 'make bindeb-pkg' command with parallelism (-j) and custom local version
-          make -j $(($(nproc) + 1)) bindeb-pkg LOCALVERSION=-ck
-          
-      - name: Upload kernel artifacts
+          echo "=== PRE-BUILD CCACHE STATUS ==="
+          echo "CCACHE_DIR=$CCACHE_DIR"
+          ccache -s || true
+          which gcc && ls -l "$(which gcc)" || true
+          env | grep -i ccache || true
+      - name: 🔨 Compile kernel
+        run: |
+          make defconfig
+          make -j$(($(nproc) + 1)) CC="ccache gcc" CXX="ccache g++" deb-pkg
+      - name: 🪲 Debug CCACHE (Post-build)
+        run: |
+          echo "=== POST-BUILD CCACHE STATUS ==="
+          ccache -s || true
+          du -sh /mnt/ccache || true
+      - name: 🧹 Cleanup useless DEB files
+        run: |
+          rm -f ../*dbg*.deb ../*libc-dev*.deb || true
+          ls -lh ../*.deb
+      - name: ⬆️ Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-deb-packages
-          path: |
-            ../*.deb
-            !../*dbg*.deb
+          compression-level: 6
+          retention-days: 30
+          name: ck-kernel-deb-pkgs
+          path: ../*.deb
+          if-no-files-found: error
+          
