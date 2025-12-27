@@ -1,4 +1,4 @@
-name: Build Custom Kernel DEB
+name: Build BALLS!!!!
 on:
   workflow_dispatch: null
 concurrency:
@@ -6,15 +6,17 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
+
 env:
   CCACHE_DIR: /mnt/ccache
   CCACHE_SLOPPINESS: file_macro,locale,time_macros
   CCACHE_NOHASHDIR: true
   CCACHE_COMPRESS: 1
-  CCACHE_COMPRESSLEVEL: 9
+  CCACHE_COMPRESSLEVEL: 6
   CCACHE_DEPEND: 1
   KBUILD_BUILD_TIMESTAMP: 1970-01-01 00:00:00
   KBUILD_BUILD_VERSION: 1
+
 jobs:
   build_kernel:
     timeout-minutes: 360
@@ -22,6 +24,7 @@ jobs:
     defaults:
       run:
         shell: bash
+
     steps:
       - name: 👉🏻🗑️ Free Disk Space 🗑️
         uses: jlumbroso/free-disk-space@main
@@ -29,11 +32,13 @@ jobs:
           swap-storage: true
           large-packages: true
           tool-cache: false
+    
       - name: (づ ᴗ _ᴗ)づCheckout repository 🎁
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
           ref: ck
+      
       - name: 📦📦 Install build dependencies
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
@@ -42,15 +47,18 @@ jobs:
             libelf-dev libncurses-dev libssl-dev lz4 rsync schedtool wget zstd
             lld pkg-config devscripts make gcc debhelper llvm clang
           version: 1.1
+      
       - name: ⋆˚꩜｡ Set Swap Space
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 10
+      
       - name: 📂 Set up CCACHE_DIR mount
         run: |
           sudo mkdir -p /mnt/ccache
           sudo chown -R $USER:$USER /mnt/ccache
           df -h
+      
       - name: 🏃 Restore CCACHE
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -60,6 +68,7 @@ jobs:
           max-size: 10G
           restore-keys: kernel-build-${{ runner.os }}-
           verbose: 2
+      
       - name: 🪳 Debug CCACHE Status (Pre-build)
         run: |
           echo "=== PRE-BUILD CCACHE STATUS ==="
@@ -67,19 +76,23 @@ jobs:
           ccache -s || true
           which gcc && ls -l "$(which gcc)" || true
           env | grep -i ccache || true
+      
       - name: 🔨 Compile kernel
         run: |
           make defconfig
-          make -j$(($(nproc) + 1)) CC="ccache gcc" CXX="ccache g++" deb-pkg
+          make -j$(($(nproc) + 1)) CC="ccache gcc" CXX="ccache g++" bindeb-pkg
+      
       - name: 🪲 Debug CCACHE (Post-build)
         run: |
           echo "=== POST-BUILD CCACHE STATUS ==="
           ccache -s || true
           du -sh /mnt/ccache || true
+      
       - name: 🧹 Cleanup useless DEB files
         run: |
           rm -f ../*dbg*.deb ../*libc-dev*.deb || true
           ls -lh ../*.deb
+
       - name: ⬆️ Upload artifacts
         uses: actions/upload-artifact@v4
         with:
