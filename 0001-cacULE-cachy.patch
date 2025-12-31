@@ -247,3 +247,345 @@ index ce1435cb0..c00543da7 100644
  
  config SCHED_HRTICK
  	def_bool HIGH_RES_TIMERS
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index f754a60de..64c134cb4 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -4447,6 +4447,11 @@ static void __sched_fork(u64 clone_flags, struct task_struct *p)
+ 	p->se.prev_sum_exec_runtime	= 0;
+ 	p->se.nr_migrations		= 0;
+ 	p->se.vruntime			= 0;
++
++#ifdef CONFIG_CACULE_SCHED
++	p->se.cacule_node.vruntime	= 0;
++#endif
++
+ 	p->se.vlag			= 0;
+ 	INIT_LIST_HEAD(&p->se.group_node);
+ 
+@@ -4833,6 +4838,11 @@ void wake_up_new_task(struct task_struct *p)
+ 	update_rq_clock(rq);
+ 	post_init_entity_util_avg(p);
+ 
++#ifdef CONFIG_CACULE_SCHED
++	p->se.cacule_node.cacule_start_time = sched_clock();
++#endif
++
++
+ 	activate_task(rq, p, ENQUEUE_NOCLOCK | ENQUEUE_INITIAL);
+ 	trace_sched_wakeup_new(p);
+ 	wakeup_preempt(rq, p, wake_flags);
+@@ -5686,6 +5696,7 @@ static void sched_tick_remote(struct work_struct *work)
+ 			WARN_ON_ONCE(rq->curr != rq->donor);
+ 			update_rq_clock(rq);
+ 
++#if !defined(CONFIG_CACULE_SCHED)
+ 			if (!is_idle_task(curr)) {
+ 				/*
+ 				 * Make sure the next tick runs within a
+@@ -5694,6 +5705,8 @@ static void sched_tick_remote(struct work_struct *work)
+ 				u64 delta = rq_clock_task(rq) - curr->se.exec_start;
+ 				WARN_ON_ONCE(delta > (u64)NSEC_PER_SEC * 3);
+ 			}
++#endif
++
+ 			curr->sched_class->task_tick(rq, curr, 0);
+ 
+ 			calc_load_nohz_remote(rq);
+diff --git a/kernel/sched/debug.c b/kernel/sched/debug.c
+index 02e16b70a..2278a8a6b 100644
+--- a/kernel/sched/debug.c
++++ b/kernel/sched/debug.c
+@@ -819,15 +819,19 @@ void print_cfs_rq(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq)
+ 	last = __pick_last_entity(cfs_rq);
+ 	if (last)
+ 		right_vruntime = last->vruntime;
++#if !defined(CONFIG_CACULE_SCHED)
+ 	min_vruntime = cfs_rq->min_vruntime;
+ 	raw_spin_rq_unlock_irqrestore(rq, flags);
++#endif
+ 
+ 	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "left_deadline",
+ 			SPLIT_NS(left_deadline));
+ 	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "left_vruntime",
+ 			SPLIT_NS(left_vruntime));
++#if !defined(CONFIG_CACULE_SCHED)
+ 	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "min_vruntime",
+ 			SPLIT_NS(min_vruntime));
++#endif
+ 	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "avg_vruntime",
+ 			SPLIT_NS(avg_vruntime(cfs_rq)));
+ 	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "right_vruntime",
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 71d3f4125..bd99e733e 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -19,6 +19,10 @@
+  *
+  *  Adaptive scheduling granularity, math enhancements by Peter Zijlstra
+  *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra
++ *
++ *  CacULE enhancements CPU cache and scheduler based on
++ *  Interactivity Score.
++ *  (C) 2020 Hamad Al Marri <hamad.s.almarri@gmail.com>
+  */
+ #include <linux/energy_model.h>
+ #include <linux/mmap_lock.h>
+@@ -58,6 +62,22 @@
+ #include "stats.h"
+ #include "autogroup.h"
+ 
++#ifdef CONFIG_CACULE_SCHED
++unsigned int __read_mostly cacule_max_lifetime		= 11000; // in ms
++unsigned int __read_mostly interactivity_factor		= 65536;
++int __read_mostly cacule_yield				= 1;
++
++#define YIELD_MARK					0x8000000000000000ULL
++#define YIELD_UNMARK					0x7FFFFFFFFFFFFFFFULL
++
++unsigned int __read_mostly cache_factor			= 13107;
++unsigned int __read_mostly cache_divisor		= 1000000; // 1ms
++
++unsigned int __read_mostly starve_factor		= 19660;
++unsigned int __read_mostly starve_divisor		= 3000000; // 3ms
++#endif
++
++
+ /*
+  * The initial- and re-scaling of tunables is configurable
+  *
+@@ -297,6 +317,70 @@ static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
+ 
+ const struct sched_class fair_sched_class;
+ 
++
++#ifdef CONFIG_CACULE_SCHED
++static inline struct sched_entity *se_of(struct cacule_node *cn)
++{
++	return container_of(cn, struct sched_entity, cacule_node);
++}
++#endif
++
++
++#ifdef CONFIG_CACULE_SCHED
++/*
++ * Enqueue an entity
++ */
++static void __enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *_se)
++{
++	struct cacule_node *se = &(_se->cacule_node);
++
++	se->next = NULL;
++	se->prev = NULL;
++
++	if (cfs_rq->head) {
++		// insert se at head
++		se->next		= cfs_rq->head;
++		cfs_rq->head->prev	= se;
++
++		// lastly reset the head
++		cfs_rq->head		= se;
++	} else {
++		// if empty rq
++		cfs_rq->head = se;
++	}
++}
++
++static void __dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *_se)
++{
++	struct cacule_node *se = &(_se->cacule_node);
++
++	// if only one se in rq
++	if (cfs_rq->head->next == NULL) {
++		cfs_rq->head = NULL;
++	} else if (se == cfs_rq->head) {
++		// if it is the head
++		cfs_rq->head		= cfs_rq->head->next;
++		cfs_rq->head->prev	= NULL;
++	} else {
++		// if in the middle
++		struct cacule_node *prev = se->prev;
++		struct cacule_node *next = se->next;
++
++		prev->next = next;
++		if (next)
++			next->prev = prev;
++	}
++}
++
++struct sched_entity *__pick_first_entity(struct cfs_rq *cfs_rq)
++{
++	if (!cfs_rq->head)
++		return NULL;
++
++	return se_of(cfs_rq->head);
++}
++#else
++
+ /**************************************************************
+  * CFS operations on generic schedulable entities:
+  */
+@@ -1224,7 +1308,13 @@ static void update_curr(struct cfs_rq *cfs_rq)
+ 	if (unlikely(delta_exec <= 0))
+ 		return;
+ 
++#ifdef CONFIG_CACULE_SCHED
++	curr->cacule_node.last_run = sched_clock();
+ 	curr->vruntime += calc_delta_fair(delta_exec, curr);
++	curr->cacule_node.vruntime += calc_delta_fair(delta_exec, curr);
++#else
++	curr->vruntime += calc_delta_fair(delta_exec, curr);
++#endif
+ 	resched = update_deadline(cfs_rq, curr);
+ 	update_min_vruntime(cfs_rq);
+ 
+@@ -5239,6 +5329,77 @@ static void
+ requeue_delayed_entity(struct sched_entity *se);
+ 
+ static void
++
++#ifdef CONFIG_CACULE_SCHED
++static unsigned int
++calc_interactivity(u64 now, struct cacule_node *se)
++{
++	u64 l_se, vr_se, sleep_se = 1ULL, u64_factor_m, _2m;
++	unsigned int score_se;
++
++	/*
++	 * in case of vruntime==0, logical OR with 1 would
++	 * make sure that the least sig. bit is 1
++	 */
++	l_se		= now - se->cacule_start_time;
++	vr_se		= se->vruntime | 1;
++	u64_factor_m	= interactivity_factor;
++	_2m		= u64_factor_m << 1;
++
++	/* safety check */
++	if (likely(l_se > vr_se))
++		sleep_se = (l_se - vr_se) | 1;
++
++	if (sleep_se >= vr_se)
++		score_se = u64_factor_m / (sleep_se / vr_se);
++	else
++		score_se = _2m - (u64_factor_m / (vr_se / sleep_se));
++
++	return score_se;
++}
++
++static inline int cn_has_idle_policy(struct cacule_node *cn)
++{
++	struct sched_entity *se = se_of(cn);
++
++	if (!entity_is_task(se))
++		return false;
++
++	return task_has_idle_policy(task_of(se));
++}
++
++/*
++ * Does se have lower interactivity score value (i.e. interactive) than curr?
++ * If yes, return 1, otherwise return -1
++ */
++static inline int
++entity_before(u64 now, struct cacule_node *curr, struct cacule_node *se)
++{
++	unsigned int score_curr, score_se;
++	int diff;
++	int is_curr_idle = cn_has_idle_policy(curr);
++	int is_se_idle   = cn_has_idle_policy(se);
++
++	/* if curr is normal but se is idle class, then no */
++	if (!is_curr_idle && is_se_idle)
++		return -1;
++
++	/* if curr is idle class and se is normal, then yes */
++	if (is_curr_idle && !is_se_idle)
++		return 1;
++
++	score_curr	 = calc_interactivity(now, curr);
++	score_se	 = calc_interactivity(now, se);
++
++	diff		= score_se - score_curr;
++
++	if (diff < 0)
++		return 1;
++
++	return -1;
++}
++#endif /* CONFIG_CACULE_SCHED */
++
+ enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
+ {
+ 	bool curr = cfs_rq->curr == se;
+@@ -5461,6 +5622,32 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
+ }
+ 
+ static void
++#ifdef CONFIG_CACULE_SCHED
++static struct sched_entity *
++pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
++{
++	struct cacule_node *se = cfs_rq->head;
++	struct cacule_node *next;
++	u64 now = sched_clock();
++
++	if (!se)
++		return curr;
++
++	next = se->next;
++	while (next) {
++		if (entity_before(now, se, next) == 1)
++			se = next;
++
++		next = next->next;
++	}
++
++	if (curr && entity_before(now, se, &curr->cacule_node) == 1)
++		return curr;
++
++	return se_of(se);
++}
++#else
++#endif /* CONFIG_CACULE_SCHED */
+ set_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
+ {
+ 	clear_buddies(cfs_rq, se);
+diff --git a/kernel/sched/features.h b/kernel/sched/features.h
+index 3c12d9f93..04a961df2 100644
+--- a/kernel/sched/features.h
++++ b/kernel/sched/features.h
+@@ -85,7 +85,6 @@ SCHED_FEAT(TTWU_QUEUE, true)
+ /*
+  * When doing wakeups, attempt to limit superfluous scans of the LLC domain.
+  */
+-SCHED_FEAT(SIS_UTIL, true)
+ 
+ /*
+  * Issue a WARN when we do multiple update_rq_clock() calls
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index adfb6e340..a5447cb99 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -695,6 +695,9 @@ struct cfs_rq {
+ 	 * It is set to NULL otherwise (i.e when none are currently running).
+ 	 */
+ 	struct sched_entity	*curr;
++#ifdef CONFIG_CACULE_SCHED
++	struct cacule_node	*head;
++#else
+ 	struct sched_entity	*next;
+ 
+ 	/*
+@@ -1147,6 +1150,12 @@ struct rq {
+ 	struct cfs_rq		cfs;
+ 	struct rt_rq		rt;
+ 	struct dl_rq		dl;
++
++#ifdef CONFIG_CACULE_RDB
++	unsigned int		max_IS_score;
++	struct task_struct	*to_migrate_task;
++#endif
++
+ #ifdef CONFIG_SCHED_CLASS_EXT
+ 	struct scx_rq		scx;
+ #endif

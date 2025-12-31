@@ -567,10 +567,24 @@ struct sched_statistics {
 #endif /* CONFIG_SCHEDSTATS */
 } ____cacheline_aligned;
 
+
+#ifdef CONFIG_CACULE_SCHED
+struct cacule_node {
+	struct cacule_node*		next;
+	struct cacule_node*		prev;
+	u64				cacule_start_time;
+	u64				last_run;
+	u64				vruntime;
+};
+#endif
+
 struct sched_entity {
 	/* For load-balancing: */
 	struct load_weight		load;
 	struct rb_node			run_node;
+#ifdef CONFIG_CACULE_SCHED
+	struct cacule_node		cacule_node;
+#endif
 	u64				deadline;
 	u64				min_vruntime;
 	u64				min_slice;
