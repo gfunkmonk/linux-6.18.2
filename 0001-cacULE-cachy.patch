@@ -248,7 +248,7 @@ index ce1435cb0..c00543da7 100644
  config SCHED_HRTICK
  	def_bool HIGH_RES_TIMERS
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index f754a60de..64c134cb4 100644
+index f754a60de..28eea3f19 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
 @@ -4447,6 +4447,11 @@ static void __sched_fork(u64 clone_flags, struct task_struct *p)
@@ -292,6 +292,21 @@ index f754a60de..64c134cb4 100644
  			curr->sched_class->task_tick(rq, curr, 0);
  
  			calc_load_nohz_remote(rq);
+@@ -8655,6 +8668,14 @@ void __init sched_init(void)
+ 	BUG_ON(!sched_class_above(&ext_sched_class, &idle_sched_class));
+ #endif
+ 
++#ifdef CONFIG_CACULE_SCHED
++#ifdef CONFIG_CACULE_RDB
++	printk(KERN_INFO "CacULE CPU scheduler (RDB) v6.0 by Hamad Al Marri.");
++#else
++	printk(KERN_INFO "CacULE CPU scheduler v6.0 by Hamad Al Marri.");
++#endif
++#endif
++
+ 	wait_bit_init();
+ 
+ #ifdef CONFIG_FAIR_GROUP_SCHED
 diff --git a/kernel/sched/debug.c b/kernel/sched/debug.c
 index 02e16b70a..2278a8a6b 100644
 --- a/kernel/sched/debug.c
