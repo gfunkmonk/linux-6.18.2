@@ -695,6 +695,9 @@ struct cfs_rq {
 	 * It is set to NULL otherwise (i.e when none are currently running).
 	 */
 	struct sched_entity	*curr;
+#ifdef CONFIG_CACULE_SCHED
+	struct cacule_node	*head;
+#else
 	struct sched_entity	*next;
 
 	/*
@@ -1147,6 +1150,12 @@ struct rq {
 	struct cfs_rq		cfs;
 	struct rt_rq		rt;
 	struct dl_rq		dl;
+
+#ifdef CONFIG_CACULE_RDB
+	unsigned int		max_IS_score;
+	struct task_struct	*to_migrate_task;
+#endif
+
 #ifdef CONFIG_SCHED_CLASS_EXT
 	struct scx_rq		scx;
 #endif

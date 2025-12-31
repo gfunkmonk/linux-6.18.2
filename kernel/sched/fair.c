@@ -19,6 +19,10 @@
  *
  *  Adaptive scheduling granularity, math enhancements by Peter Zijlstra
  *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra
+ *
+ *  CacULE enhancements CPU cache and scheduler based on
+ *  Interactivity Score.
+ *  (C) 2020 Hamad Al Marri <hamad.s.almarri@gmail.com>
  */
 #include <linux/energy_model.h>
 #include <linux/mmap_lock.h>
@@ -57,6 +61,22 @@
 #include "sched.h"
 #include "stats.h"
 #include "autogroup.h"
+
+#ifdef CONFIG_CACULE_SCHED
+unsigned int __read_mostly cacule_max_lifetime		= 11000; // in ms
+unsigned int __read_mostly interactivity_factor		= 65536;
+int __read_mostly cacule_yield				= 1;
+
+#define YIELD_MARK					0x8000000000000000ULL
+#define YIELD_UNMARK					0x7FFFFFFFFFFFFFFFULL
+
+unsigned int __read_mostly cache_factor			= 13107;
+unsigned int __read_mostly cache_divisor		= 1000000; // 1ms
+
+unsigned int __read_mostly starve_factor		= 19660;
+unsigned int __read_mostly starve_divisor		= 3000000; // 3ms
+#endif
+
 
 /*
  * The initial- and re-scaling of tunables is configurable
@@ -152,6 +172,59 @@ static const struct ctl_table sched_fair_sysctls[] = {
 		.extra1		= SYSCTL_ZERO,
 	},
 #endif /* CONFIG_NUMA_BALANCING */
+#ifdef CONFIG_CACULE_SCHED
+	{
+		.procname	= "sched_interactivity_factor",
+		.data		= &interactivity_factor,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "sched_max_lifetime_ms",
+		.data		= &cacule_max_lifetime,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "sched_cache_factor",
+		.data		= &cache_factor,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "sched_cache_divisor",
+		.data		= &cache_divisor,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "sched_starve_factor",
+		.data		= &starve_factor,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "sched_starve_divisor",
+		.data		= &starve_divisor,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "sched_cacule_yield",
+		.data		= &cacule_yield,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= SYSCTL_ONE,
+	},
+#endif /* CONFIG_CACULE_SCHED */
 };
 
 static int __init sched_fair_sysctl_init(void)
@@ -296,6 +369,70 @@ static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
 }
 
 const struct sched_class fair_sched_class;
+
+
+#ifdef CONFIG_CACULE_SCHED
+static inline struct sched_entity *se_of(struct cacule_node *cn)
+{
+	return container_of(cn, struct sched_entity, cacule_node);
+}
+#endif
+
+
+#ifdef CONFIG_CACULE_SCHED
+/*
+ * Enqueue an entity
+ */
+static void __enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *_se)
+{
+	struct cacule_node *se = &(_se->cacule_node);
+
+	se->next = NULL;
+	se->prev = NULL;
+
+	if (cfs_rq->head) {
+		// insert se at head
+		se->next		= cfs_rq->head;
+		cfs_rq->head->prev	= se;
+
+		// lastly reset the head
+		cfs_rq->head		= se;
+	} else {
+		// if empty rq
+		cfs_rq->head = se;
+	}
+}
+
+static void __dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *_se)
+{
+	struct cacule_node *se = &(_se->cacule_node);
+
+	// if only one se in rq
+	if (cfs_rq->head->next == NULL) {
+		cfs_rq->head = NULL;
+	} else if (se == cfs_rq->head) {
+		// if it is the head
+		cfs_rq->head		= cfs_rq->head->next;
+		cfs_rq->head->prev	= NULL;
+	} else {
+		// if in the middle
+		struct cacule_node *prev = se->prev;
+		struct cacule_node *next = se->next;
+
+		prev->next = next;
+		if (next)
+			next->prev = prev;
+	}
+}
+
+struct sched_entity *__pick_first_entity(struct cfs_rq *cfs_rq)
+{
+	if (!cfs_rq->head)
+		return NULL;
+
+	return se_of(cfs_rq->head);
+}
+#else
 
 /**************************************************************
  * CFS operations on generic schedulable entities:
@@ -1224,7 +1361,13 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	if (unlikely(delta_exec <= 0))
 		return;
 
+#ifdef CONFIG_CACULE_SCHED
+	curr->cacule_node.last_run = sched_clock();
 	curr->vruntime += calc_delta_fair(delta_exec, curr);
+	curr->cacule_node.vruntime += calc_delta_fair(delta_exec, curr);
+#else
+	curr->vruntime += calc_delta_fair(delta_exec, curr);
+#endif
 	resched = update_deadline(cfs_rq, curr);
 	update_min_vruntime(cfs_rq);
 
@@ -5239,6 +5382,77 @@ static void
 requeue_delayed_entity(struct sched_entity *se);
 
 static void
+
+#ifdef CONFIG_CACULE_SCHED
+static unsigned int
+calc_interactivity(u64 now, struct cacule_node *se)
+{
+	u64 l_se, vr_se, sleep_se = 1ULL, u64_factor_m, _2m;
+	unsigned int score_se;
+
+	/*
+	 * in case of vruntime==0, logical OR with 1 would
+	 * make sure that the least sig. bit is 1
+	 */
+	l_se		= now - se->cacule_start_time;
+	vr_se		= se->vruntime | 1;
+	u64_factor_m	= interactivity_factor;
+	_2m		= u64_factor_m << 1;
+
+	/* safety check */
+	if (likely(l_se > vr_se))
+		sleep_se = (l_se - vr_se) | 1;
+
+	if (sleep_se >= vr_se)
+		score_se = u64_factor_m / (sleep_se / vr_se);
+	else
+		score_se = _2m - (u64_factor_m / (vr_se / sleep_se));
+
+	return score_se;
+}
+
+static inline int cn_has_idle_policy(struct cacule_node *cn)
+{
+	struct sched_entity *se = se_of(cn);
+
+	if (!entity_is_task(se))
+		return false;
+
+	return task_has_idle_policy(task_of(se));
+}
+
+/*
+ * Does se have lower interactivity score value (i.e. interactive) than curr?
+ * If yes, return 1, otherwise return -1
+ */
+static inline int
+entity_before(u64 now, struct cacule_node *curr, struct cacule_node *se)
+{
+	unsigned int score_curr, score_se;
+	int diff;
+	int is_curr_idle = cn_has_idle_policy(curr);
+	int is_se_idle   = cn_has_idle_policy(se);
+
+	/* if curr is normal but se is idle class, then no */
+	if (!is_curr_idle && is_se_idle)
+		return -1;
+
+	/* if curr is idle class and se is normal, then yes */
+	if (is_curr_idle && !is_se_idle)
+		return 1;
+
+	score_curr	 = calc_interactivity(now, curr);
+	score_se	 = calc_interactivity(now, se);
+
+	diff		= score_se - score_curr;
+
+	if (diff < 0)
+		return 1;
+
+	return -1;
+}
+#endif /* CONFIG_CACULE_SCHED */
+
 enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 {
 	bool curr = cfs_rq->curr == se;
@@ -5461,6 +5675,32 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 }
 
 static void
+#ifdef CONFIG_CACULE_SCHED
+static struct sched_entity *
+pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
+{
+	struct cacule_node *se = cfs_rq->head;
+	struct cacule_node *next;
+	u64 now = sched_clock();
+
+	if (!se)
+		return curr;
+
+	next = se->next;
+	while (next) {
+		if (entity_before(now, se, next) == 1)
+			se = next;
+
+		next = next->next;
+	}
+
+	if (curr && entity_before(now, se, &curr->cacule_node) == 1)
+		return curr;
+
+	return se_of(se);
+}
+#else
+#endif /* CONFIG_CACULE_SCHED */
 set_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
 	clear_buddies(cfs_rq, se);
