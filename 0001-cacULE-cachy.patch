@@ -332,7 +332,7 @@ index 02e16b70a..2278a8a6b 100644
  			SPLIT_NS(avg_vruntime(cfs_rq)));
  	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "right_vruntime",
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 71d3f4125..bd99e733e 100644
+index 71d3f4125..e9e71621c 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
 @@ -19,6 +19,10 @@
@@ -369,7 +369,67 @@ index 71d3f4125..bd99e733e 100644
  /*
   * The initial- and re-scaling of tunables is configurable
   *
-@@ -297,6 +317,70 @@ static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
+@@ -152,6 +172,59 @@ static const struct ctl_table sched_fair_sysctls[] = {
+ 		.extra1		= SYSCTL_ZERO,
+ 	},
+ #endif /* CONFIG_NUMA_BALANCING */
++#ifdef CONFIG_CACULE_SCHED
++	{
++		.procname	= "sched_interactivity_factor",
++		.data		= &interactivity_factor,
++		.maxlen		= sizeof(unsigned int),
++		.mode		= 0644,
++		.proc_handler	= proc_dointvec,
++	},
++	{
++		.procname	= "sched_max_lifetime_ms",
++		.data		= &cacule_max_lifetime,
++		.maxlen		= sizeof(unsigned int),
++		.mode		= 0644,
++		.proc_handler	= proc_dointvec,
++	},
++	{
++		.procname	= "sched_cache_factor",
++		.data		= &cache_factor,
++		.maxlen		= sizeof(unsigned int),
++		.mode		= 0644,
++		.proc_handler	= proc_dointvec,
++	},
++	{
++		.procname	= "sched_cache_divisor",
++		.data		= &cache_divisor,
++		.maxlen		= sizeof(unsigned int),
++		.mode		= 0644,
++		.proc_handler	= proc_dointvec,
++	},
++	{
++		.procname	= "sched_starve_factor",
++		.data		= &starve_factor,
++		.maxlen		= sizeof(unsigned int),
++		.mode		= 0644,
++		.proc_handler	= proc_dointvec,
++	},
++	{
++		.procname	= "sched_starve_divisor",
++		.data		= &starve_divisor,
++		.maxlen		= sizeof(unsigned int),
++		.mode		= 0644,
++		.proc_handler	= proc_dointvec,
++	},
++	{
++		.procname	= "sched_cacule_yield",
++		.data		= &cacule_yield,
++		.maxlen		= sizeof(int),
++		.mode		= 0644,
++		.proc_handler	= proc_dointvec_minmax,
++		.extra1		= SYSCTL_ZERO,
++		.extra2		= SYSCTL_ONE,
++	},
++#endif /* CONFIG_CACULE_SCHED */
+ };
+ 
+ static int __init sched_fair_sysctl_init(void)
+@@ -297,6 +370,70 @@ static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
  
  const struct sched_class fair_sched_class;
  
@@ -440,7 +500,7 @@ index 71d3f4125..bd99e733e 100644
  /**************************************************************
   * CFS operations on generic schedulable entities:
   */
-@@ -1224,7 +1308,13 @@ static void update_curr(struct cfs_rq *cfs_rq)
+@@ -1224,7 +1361,13 @@ static void update_curr(struct cfs_rq *cfs_rq)
  	if (unlikely(delta_exec <= 0))
  		return;
  
@@ -454,7 +514,7 @@ index 71d3f4125..bd99e733e 100644
  	resched = update_deadline(cfs_rq, curr);
  	update_min_vruntime(cfs_rq);
  
-@@ -5239,6 +5329,77 @@ static void
+@@ -5239,6 +5382,77 @@ static void
  requeue_delayed_entity(struct sched_entity *se);
  
  static void
@@ -532,7 +592,7 @@ index 71d3f4125..bd99e733e 100644
  enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
  {
  	bool curr = cfs_rq->curr == se;
-@@ -5461,6 +5622,32 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
+@@ -5461,6 +5675,32 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
  }
  
  static void
